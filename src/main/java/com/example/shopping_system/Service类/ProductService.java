@@ -7,8 +7,10 @@ import com.example.shopping_system.DTO类.SellerDTO;
 import com.example.shopping_system.实体类.Category;
 import com.example.shopping_system.实体类.Product;
 import com.example.shopping_system.实体类.ProductStatus;
+import com.example.shopping_system.实体类.Seller;
 import com.example.shopping_system.Repository接口.CategoryRepository;
 import com.example.shopping_system.Repository接口.ProductRepository;
+import com.example.shopping_system.Repository接口.SellerRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +40,9 @@ public class ProductService {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private SellerRepository sellerRepository;
 
     @Autowired
     private RedisCacheService redisCacheService;
@@ -204,24 +209,72 @@ public class ProductService {
     }
 
     /**
-     * 根据ID获取商品（带Redis缓存）
+     * 根据ID获取商品（带Redis缓存，缓存不可用时自动降级直查数据库）
      */
     public Optional<Product> getProductById(Long id) {
         // 1. 尝试从Redis缓存获取
         Product cachedProduct = redisCacheService.getCachedProduct(id);
         if (cachedProduct != null) {
-            log.info("从Redis缓存获取商品: id={}", id);
-            return Optional.of(cachedProduct);
+            // 缓存的Product可能丢失seller关联，必须从数据库校准后才能用于购买链路
+            if (reattachSellerFromDb(cachedProduct)) {
+                log.info("从Redis缓存获取商品: id={}", id);
+                return Optional.of(cachedProduct);
+            }
+            log.info("缓存数据不完整（缺少卖家），回退数据库查询: id={}", id);
         }
 
         // 2. 缓存未命中，从数据库查询
         log.info("Redis缓存未命中，从数据库查询商品: id={}", id);
         Optional<Product> productOpt = productRepository.findById(id);
 
-        // 3. 回填缓存
-        productOpt.ifPresent(product -> redisCacheService.cacheProduct(product));
+        // 3. 初始化懒加载关联后再回填缓存，避免缓存数据丢失seller/category
+        productOpt.ifPresent(product -> {
+            initLazyFields(product);
+            redisCacheService.cacheProduct(product);
+        });
 
         return productOpt;
+    }
+
+    /**
+     * 缓存命中的商品需要从数据库重新加载seller，保证购买链路拿到完整卖家信息
+     */
+    private boolean reattachSellerFromDb(Product product) {
+        try {
+            Seller cached = product.getSeller();
+            if (cached == null || cached.getId() == null) {
+                // 缓存里丢失了seller，无法采信，必须回退数据库
+                return false;
+            }
+            Seller fresh = sellerRepository.findById(cached.getId()).orElse(null);
+            if (fresh == null) {
+                return false;
+            }
+            product.setSeller(fresh);
+            return true;
+        } catch (Exception e) {
+            log.warn("重新加载卖家信息失败，回退数据库查询: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 初始化懒加载关联（category/seller），在写入缓存或返回前调用
+     */
+    private void initLazyFields(Product product) {
+        try {
+            if (product.getCategory() != null) {
+                org.hibernate.Hibernate.initialize(product.getCategory());
+                if (product.getCategory().getParent() != null) {
+                    org.hibernate.Hibernate.initialize(product.getCategory().getParent());
+                }
+            }
+            if (product.getSeller() != null) {
+                org.hibernate.Hibernate.initialize(product.getSeller());
+            }
+        } catch (Exception e) {
+            log.warn("初始化商品关联数据失败: {}", e.getMessage());
+        }
     }
 
     public Product updateProductStatus(Long productId, ProductStatus status) {
