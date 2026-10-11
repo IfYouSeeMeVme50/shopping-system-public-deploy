@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>购物系统 - 卖家后台管理系统</title>
+    <link rel="stylesheet" href="/style.css">
+    <!-- 富文本编辑器样式 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css">
+</head>
+<body>
+    <div class="container seller-container">
+        <header>
+            <h1>卖家后台管理系统</h1>
+            <p>管理您的商品和购买意向</p>
+        </header>
+
+        <div id="login-section">
+            <div class="login-form">
+                <h2>卖家登录</h2>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="username">用户名：</label>
+                        <input type="text" id="username" name="username" value="admin" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">密码：</label>
+                        <input type="password" id="password" name="password" value="admin123" required>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">登录</button>
+                        <!-- 返回主页按钮 - 登录前可见 -->
+                        <button type="button" class="btn btn-secondary" onclick="goToHomePage()" style="margin-left: 10px;">返回主页</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="dashboard" style="display: none;">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('product-management')">商品管理</div>
+                <div class="tab" onclick="switchTab('category-management')">分类管理</div>
+                <div class="tab" onclick="switchTab('purchase-intents')">购买意向</div>
+                <div class="tab" onclick="switchTab('history')">历史商品</div>
+                <div class="tab" onclick="switchTab('change-password')">修改密码</div>
+                <div class="tab" onclick="switchTab('customer-info')">买家信息</div>
+                <!-- 买家界面按钮和退出登录按钮 - 置于选项卡右侧 -->
+                <div style="display: flex; margin-left: auto;">
+                    <div class="tab" onclick="goToHomePage()">买家界面</div>
+                    <div class="tab" onclick="logout()">退出登录</div>
+                </div>
+            </div>
+<!--管理-->
+            <!-- 商品管理 -->
+            <div id="product-management" class="tab-content active">
+                <h2>商品管理</h2>
+                <div id="current-product-info" style="margin-bottom: 20px;"></div>
+                
+                <h3>发布新商品</h3>
+                <form id="product-form" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="product-name">商品名称：</label>
+                        <input type="text" id="product-name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-description">商品描述：</label>
+                        <div id="editor-container" style="height: 200px;"></div>
+                        <textarea id="product-description" name="description" style="display: none;"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="primary-category">商品一级类别：</label>
+                        <select id="primary-category" name="primaryCategory" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="secondary-category">商品二级类别：</label>
+                        <select id="secondary-category" name="secondaryCategory" required></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="product-price">商品价格：</label>
+                        <input type="number" id="product-price" name="price" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-stock">库存数量：</label>
+                        <input type="number" id="product-stock" name="stock" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-images">商品图片：</label>
+                        <input type="file" id="product-images" name="images" accept="image/*" multiple>
+                        <p class="form-hint">可选择多张图片，第一张将作为主图</p>
+                    </div>
+                    <div id="image-preview" class="image-preview-container" style="display: none;">
+                        <h4>图片预览</h4>
+                        <div id="preview-images" class="preview-grid"></div>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-success">发布商品</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 分类管理 -->
+            <div id="category-management" class="tab-content">
+                <h2>分类管理</h2>
+                <p class="form-hint">创建一级分类（大类）后，可以为其添加多个二级分类（小类）。</p>
+                <div class="category-management-grid">
+                    <form id="primary-category-form" class="category-form">
+                        <h3>创建一级分类</h3>
+                        <div class="form-group">
+                            <label for="new-primary-name">一级分类名称：</label>
+                            <input type="text" id="new-primary-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-primary-description">描述（可选）：</label>
+                            <textarea id="new-primary-description" rows="2" placeholder="简单介绍该分类"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">创建一级分类</button>
+                        </div>
+                    </form>
+
+                    <form id="secondary-category-form" class="category-form">
+                        <h3>创建二级分类</h3>
+                        <div class="form-group">
+                            <label for="secondary-parent">所属一级分类：</label>
+                            <select id="secondary-parent" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-secondary-name">二级分类名称：</label>
+                            <input type="text" id="new-secondary-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-secondary-description">描述（可选）：</label>
+                            <textarea id="new-secondary-description" rows="2" placeholder="简单介绍该分类"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-success">创建二级分类</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="category-list">
+                    <h3>当前分类</h3>
+                    <div id="category-tree" class="category-tree"></div>
+                </div>
+            </div>
+
+            <!-- 购买意向 -->
+            <div id="purchase-intents" class="tab-content">
+                <h2>购买意向管理</h2>
+                <div id="intents-list"></div>
+            </div>
+
+            <!-- 历史商品 -->
+            <div id="history" class="tab-content">
+                <h2>历史商品记录</h2>
+                <div id="products-history"></div>
+            </div>
+
+            <!-- 修改密码 -->
+            <div id="change-password" class="tab-content">
+                <h2>修改密码</h2>
+                <form id="change-password-form">
+                    <div class="form-group">
+                        <label for="old-password">原密码：</label>
+                        <input type="password" id="old-password" name="oldPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-password">新密码：</label>
+                        <input type="password" id="new-password" name="newPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm-password">确认新密码：</label>
+                        <input type="password" id="confirm-password" name="confirmPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">修改密码</button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- 买家信息 -->
+            <div id="customer-info" class="tab-content">
+                <h2>买家信息管理</h2>
+                <div id="customers-list"></div>
+            </div>
+        </div>
+
+        <div id="seller-message" class="message" style="display: none;"></div>
+    </div>
+
+    <script src="/seller-script.js?v=20251225"></script>
+</body>
+</html>
+
+<!-- 2025.10.29移除视频音频上传相关代码 -->

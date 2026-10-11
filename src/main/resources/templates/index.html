@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>购物系统 - 买家中心</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container buyer-container">
+        <!-- 顶部导航 -->
+        <header class="buyer-header">
+            <div class="header-content">
+                <h1>购物系统</h1>
+                <div class="header-actions">
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="搜索商品..." onkeypress="handleSearchKeypress(event)">
+                        <button onclick="searchProducts()">搜索</button>
+                    </div>
+                    <div class="user-section">
+                        <span id="user-info" style="display: none;">
+                            欢迎，<span id="username-display"></span>
+                            <button onclick="showUserMenu()" class="btn btn-secondary">我的账户</button>
+                        </span>
+                        <span id="login-register">
+                            <button onclick="showLoginForm()" class="btn btn-primary">登录</button>
+                            <button onclick="showRegisterForm()" class="btn btn-secondary">注册</button>
+                        </span>
+                        <div class="cart-icon" id="cart-icon" style="display: none;">
+                            <button onclick="showCart()" class="btn btn-primary cart-button">
+                                🛒 购物车 <span class="cart-badge" id="cart-badge">0</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- 登录表单 -->
+            <div id="login-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal('login-modal')">&times;</span>
+                    <h2>用户登录</h2>
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label for="login-username">用户名：</label>
+                            <input type="text" id="login-username" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">密码：</label>
+                            <input type="password" id="login-password" name="password" required>
+                        </div>
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">登录</button>
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('login-modal')">取消</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 注册表单 -->
+            <div id="register-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal('register-modal')">&times;</span>
+                    <h2>用户注册</h2>
+                    <form id="register-form">
+                        <div class="form-group">
+                            <label for="register-username">用户名：</label>
+                            <input type="text" id="register-username" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-password">密码：</label>
+                            <input type="password" id="register-password" name="password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-phone">电话：</label>
+                            <input type="tel" id="register-phone" name="phone" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-address">默认交易地点：</label>
+                            <textarea id="register-address" name="address" rows="3" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-success">注册</button>
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('register-modal')">取消</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 用户菜单 -->
+            <div id="user-menu" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal('user-menu')">&times;</span>
+                    <h2>我的账户</h2>
+                    <div class="user-menu-options">
+                        <button class="menu-btn" onclick="showOrderHistory()">历史订单</button>
+                        <button class="menu-btn" onclick="showFavorites()">我的收藏</button>
+                        <button class="menu-btn" onclick="logout()">退出登录</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 订单历史 -->
+            <div id="order-history-modal" class="modal" style="display: none;">
+                <div class="modal-content large-modal">
+                    <span class="close" onclick="closeModal('order-history-modal')">&times;</span>
+                    <h2>历史订单</h2>
+                    <div class="order-filter-tabs">
+                        <button class="tab-btn active" id="order-tab-all" onclick="setOrderFilter('all')">全部</button>
+                        <button class="tab-btn" id="order-tab-inprogress" onclick="setOrderFilter('in_progress')">正在进行的订单</button>
+                        <button class="tab-btn" id="order-tab-pending" onclick="setOrderFilter('pending')">待处理</button>
+                        <button class="tab-btn" id="order-tab-completed" onclick="setOrderFilter('completed')">已完成</button>
+                        <button class="tab-btn" id="order-tab-cancelled" onclick="setOrderFilter('cancelled')">已取消</button>
+                    </div>
+                    <div id="order-history-list" class="order-list">
+                        <!-- 订单历史将通过JavaScript动态加载 -->
+                    </div>
+                </div>
+            </div>
+
+            <section class="category-filters" id="buyer-category-filters" style="display: none;">
+                <div class="filter-group">
+                    <h3>一级分类</h3>
+                    <div class="filter-buttons" id="primary-category-filters"></div>
+                </div>
+                <div class="filter-group" id="secondary-filter-group" style="display: none;">
+                    <h3>二级分类</h3>
+                    <div class="filter-buttons" id="secondary-category-filters"></div>
+                </div>
+            </section>
+
+            <!-- 商品展示区域 -->
+            <div class="products-section">
+                <div class="products-header">
+                    <h2 id="products-title">全部商品</h2>
+                    <div class="sort-options">
+                        <select id="sort-select" onchange="sortProducts()">
+                            <option value="default">默认排序</option>
+                            <option value="price_asc">价格从低到高</option>
+                            <option value="price_desc">价格从高到低</option>
+                            <option value="name">按名称排序</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="products-grid" id="products-grid">
+                    <div class="loading">正在加载商品信息...</div>
+                </div>
+            </div>
+
+            <!-- 购物车模态框 -->
+            <div id="cart-modal" class="modal" style="display: none;">
+                <div class="modal-content large-modal">
+                    <span class="close" onclick="closeModal('cart-modal')">&times;</span>
+                    <h2>购物车</h2>
+                    <div id="cart-content">
+                        <div class="cart-items" id="cart-items">
+                            <!-- 购物车商品将通过JavaScript动态加载 -->
+                        </div>
+                        <div class="cart-summary" id="cart-summary">
+                            <div class="cart-summary-left">
+                                <label class="cart-select-all">
+                                    <input type="checkbox" id="cart-select-all">
+                                    全选
+                                </label>
+                                <span class="cart-selected-count">已选 <span id="cart-selected-count">0</span> 件</span>
+                                <div class="cart-total">
+                                    <strong>总计: ¥<span id="cart-total-amount">0.00</span></strong>
+                                </div>
+                            </div>
+                            <div class="cart-actions">
+                                <button class="btn btn-primary" onclick="showPurchaseFromCart()">立即购买</button>
+                                <button class="btn btn-secondary" onclick="clearCart()">清空购物车</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 收藏提示弹窗 -->
+            <div id="favorite-prompt-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal('favorite-prompt-modal')">&times;</span>
+                    <h3>收藏提示</h3>
+                    <div class="favorite-prompt-content">
+                        <p>您喜欢这个商品吗？可以添加到收藏夹，方便下次快速购买！</p>
+                        <div class="favorite-prompt-actions">
+                            <button class="btn btn-primary" onclick="addToFavoritesFromPrompt()">添加到收藏</button>
+                            <button class="btn btn-secondary" onclick="closeModal('favorite-prompt-modal')">暂不收藏</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 收藏列表模态框 -->
+            <div id="favorites-modal" class="modal" style="display: none;">
+                <div class="modal-content large-modal">
+                    <span class="close" onclick="closeModal('favorites-modal')">&times;</span>
+                    <h2>我的收藏</h2>
+                    <div class="favorites-actions">
+                        <button class="btn btn-secondary" onclick="selectAllFavorites()">全选</button>
+                        <button class="btn btn-primary" onclick="addSelectedToCart()">批量加入购物车</button>
+                        <button class="btn btn-danger" onclick="removeSelectedFavorites()">批量取消收藏</button>
+                    </div>
+                    <div id="favorites-list" class="favorites-list">
+                        <!-- 收藏列表将通过JavaScript动态加载 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 购买表单 -->
+            <div id="purchase-form" class="purchase-form modal" style="display: none;">
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal('purchase-form')">&times;</span>
+                    <h3>填写购买信息</h3>
+                    <form id="customer-form">
+                        <div class="form-group">
+                            <label for="customer_name">姓名：</label>
+                            <input type="text" id="customer_name" name="customer_name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="customer_phone">电话：</label>
+                            <input type="tel" id="customer_phone" name="customer_phone" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="customer_address">地址：</label>
+                            <textarea id="customer_address" name="customer_address" rows="3" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="purchase-quantity">购买数量：</label>
+                            <input type="number" id="purchase-quantity" name="quantity" min="1" value="1" required>
+                        </div>
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">提交购买意向</button>
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('purchase-form')">取消</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="message" class="message" style="display: none;"></div>
+        </main>
+
+        <footer>
+            <p>© 2025 购物系统 - 买家中心 | <a href="/seller.html">卖家后台</a></p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

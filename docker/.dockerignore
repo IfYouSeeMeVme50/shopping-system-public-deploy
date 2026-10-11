@@ -1,0 +1,25 @@
+# 忽略Git相关文件
+.git
+.gitignore
+
+# 忽略Maven构建输出
+target/
+!target/*.jar
+
+# 忽略IDE配置文件
+.idea/
+*.iml
+*.iws
+
+# 忽略操作系统文件
+.DS_Store
+Thumbs.db
+
+# 忽略日志文件
+*.log
+
+# 忽略测试文件
+src/test/
+
+# 忽略上传的文件目录（在容器中重新创建）
+uploads/
