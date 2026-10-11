@@ -1,0 +1,61 @@
+# 公网部署（Render + TiDB Cloud）生产配置
+# 敏感信息通过环境变量注入，不写入代码仓库
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # 免费实例内存512MB，连接池收紧
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 10000
+
+  jpa:
+    hibernate:
+      # 云端自动建表，保留数据
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+    show-sql: false
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  redis:
+    # 公网环境默认无Redis，配合 app.redis-enabled=false 完全短路
+    timeout: 1000ms
+
+  resources:
+    static-locations: classpath:/static/,classpath:/public/,file:./uploads/
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  # Render 通过 PORT 环境变量指定监听端口
+  port: ${PORT:8080}
+  tomcat:
+    threads:
+      max: 20
+      min-spare: 4
+
+logging:
+  level:
+    org.hibernate.SQL: warn
+    org.hibernate.type.descriptor.sql.BasicBinder: warn
+
+file:
+  upload-dir: uploads/
+
+app:
+  auto-clean: false
+  # 商品数据通过SQL导入TiDB，不执行种子初始化
+  initialize-data: false
+  # 公网部署无Redis，缓存开关关闭（代码已支持自动降级，此处为零开销短路）
+  redis-enabled: false

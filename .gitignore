@@ -36,3 +36,7 @@ build/
 *.log
 logs/
 run.log*
+
+### Build artifacts ###
+docker/*.jar
+uploads/*.rdb

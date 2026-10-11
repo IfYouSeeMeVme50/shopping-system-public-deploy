@@ -3,6 +3,7 @@ package com.example.shopping_system.Service类;
 import com.example.shopping_system.实体类.Product;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +25,12 @@ public class RedisCacheService {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
+    /**
+     * 缓存总开关：公网部署环境无Redis时设为false，所有缓存操作直接短路，零开销
+     */
+    @Value("${app.redis-enabled:true}")
+    private boolean redisEnabled;
+
     public RedisCacheService(RedisTemplate<String, Object> redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
@@ -32,6 +39,7 @@ public class RedisCacheService {
      * 缓存单个商品（Redis不可用时静默降级，不影响主流程）
      */
     public void cacheProduct(Product product) {
+        if (!redisEnabled) return;
         try {
             String key = PRODUCT_CACHE_KEY + product.getId();
             redisTemplate.opsForValue().set(key, product, CACHE_TTL_MINUTES, TimeUnit.MINUTES);
@@ -45,6 +53,7 @@ public class RedisCacheService {
      * 获取缓存的单个商品（Redis不可用时返回null，走数据库查询）
      */
     public Product getCachedProduct(Long productId) {
+        if (!redisEnabled) return null;
         try {
             String key = PRODUCT_CACHE_KEY + productId;
             Object value = redisTemplate.opsForValue().get(key);
@@ -63,6 +72,7 @@ public class RedisCacheService {
      * 缓存商品列表（首页展示商品）
      */
     public void cacheProductList(List<Product> products) {
+        if (!redisEnabled) return;
         try {
             redisTemplate.opsForValue().set(PRODUCT_LIST_CACHE_KEY, products, CACHE_TTL_MINUTES, TimeUnit.MINUTES);
             log.debug("商品列表已缓存，共 {} 条", products.size());
@@ -76,6 +86,7 @@ public class RedisCacheService {
      */
     @SuppressWarnings("unchecked")
     public List<Product> getCachedProductList() {
+        if (!redisEnabled) return null;
         try {
             Object value = redisTemplate.opsForValue().get(PRODUCT_LIST_CACHE_KEY);
             if (value instanceof List) {
@@ -93,6 +104,7 @@ public class RedisCacheService {
      * 清除商品缓存（商品信息变更时调用；Redis不可用时跳过，不影响业务写入）
      */
     public void clearProductCache(Long productId) {
+        if (!redisEnabled) return;
         try {
             String key = PRODUCT_CACHE_KEY + productId;
             redisTemplate.delete(key);
@@ -108,6 +120,7 @@ public class RedisCacheService {
      * 清除所有商品缓存
      */
     public void clearAllProductCache() {
+        if (!redisEnabled) return;
         try {
             redisTemplate.delete(PRODUCT_LIST_CACHE_KEY);
             log.debug("所有商品列表缓存已清除");
