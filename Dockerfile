@@ -18,6 +18,9 @@ COPY --from=builder /build/target/product-sale-system-1.0.0.jar /app/application
 
 RUN mkdir -p /app/uploads
 
+# 将仓库内预置的商品图片烤进镜像（Render容器磁盘重启即清空，图片必须来自镜像层）
+COPY uploads /app/uploads/
+
 EXPOSE 8080
 
 # JVM 内存上限适配免费实例：堆300m + 元空间96m + 线程栈512k

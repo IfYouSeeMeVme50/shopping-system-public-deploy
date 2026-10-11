@@ -10,7 +10,8 @@ spring:
       # 免费实例内存512MB，连接池收紧
       maximum-pool-size: 5
       minimum-idle: 1
-      connection-timeout: 10000
+      # 30秒：TiDB免费档休眠唤醒可能需要十几秒
+      connection-timeout: 30000
 
   jpa:
     hibernate:
