@@ -40,6 +40,7 @@ TiDB Cloud Starter（持久化云数据库，容器重启数据不丢失）
 - **Redis 不参与公网部署**：`app.redis-enabled=false` 完全短路，商品读写直查 TiDB
 - **建表**：首次启动由 JPA `ddl-auto: update` 自动完成，无需手动执行 SQL
 - **预置商品图片**：已烤入 Docker 镜像层（`uploads/`），部署即带图
+- **运行时上传的图片/媒体**：字节直接存 TiDB（`stored_images` 表 LONGBLOB），通过 `/images/{id}` 接口读取，容器休眠/重新部署后不丢失；旧的 `/uploads/` 文件链接继续兼容
 
 ## 正确的使用方式
 
@@ -86,8 +87,8 @@ Render 检测到 GitHub 新提交后自动重新构建并发布（约 5-8 分钟
 | 限制 | 说明 | 影响 |
 |---|---|---|
 | 应用休眠 | Render 免费版 15 分钟无访问休眠，唤醒约 1 分钟 | 首次访问变慢，不影响数据 |
-| 运行时上传的图片不持久 | Render 容器磁盘临时，休眠/重新部署后**运行期间新上传的商品图片会丢失**（预置图片已烤入镜像不受影响） | 演示后新增图片建议重新构建镜像固化，或重新上传 |
 | 数据库休眠 | TiDB 免费档同样有休眠机制 | 首次数据库连接可能多等十几秒（连接超时已放宽至 30 秒） |
+| 图片占数据库容量 | 上传图片以 BLOB 存 TiDB（单文件上限 10MB） | 免费档 25GiB 存储，课程演示量级无压力 |
 | 无缓存 | 公网无 Redis，商品读写直查数据库 | 课程演示量级下无感知 |
 
 ## 项目功能
@@ -110,10 +111,10 @@ Render 检测到 GitHub 新提交后自动重新构建并发布（约 5-8 分钟
 ```
 src/main/java/com/example/shopping_system/
 ├── ShoppingSystemApplication.java    # 主启动类
-├── Controller类/                     # 控制器层（Home/Product/PurchaseIntent/Seller/Cart/Favorite）
+├── Controller类/                     # 控制器层（Home/Product/PurchaseIntent/Seller/Cart/Favorite/Image）
 ├── Service类/                        # 服务层（含 RedisCacheService：可降级缓存）
-├── Repository接口/                   # Spring Data JPA 数据访问层
-├── 实体类/                           # Product/Category/PurchaseIntent/Seller/Customer 等
+├── Repository接口/                   # Spring Data JPA 数据访问层（含 StoredImageRepository）
+├── 实体类/                           # Product/Category/PurchaseIntent/Seller/Customer/StoredImage 等
 ├── DTO类/                            # 数据传输对象
 └── 配置类/                           # DataInitializer、WebConfig
 
