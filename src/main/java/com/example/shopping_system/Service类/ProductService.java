@@ -8,13 +8,14 @@ import com.example.shopping_system.实体类.Category;
 import com.example.shopping_system.实体类.Product;
 import com.example.shopping_system.实体类.ProductStatus;
 import com.example.shopping_system.实体类.Seller;
+import com.example.shopping_system.实体类.StoredImage;
 import com.example.shopping_system.Repository接口.CategoryRepository;
 import com.example.shopping_system.Repository接口.ProductRepository;
 import com.example.shopping_system.Repository接口.SellerRepository;
+import com.example.shopping_system.Repository接口.StoredImageRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,9 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -47,8 +45,8 @@ public class ProductService {
     @Autowired
     private RedisCacheService redisCacheService;
 
-    @Value("${file.upload-dir:uploads/}")
-    private String uploadDir;
+    @Autowired
+    private StoredImageRepository storedImageRepository;
 
     public Optional<Product> getActiveProduct() {
         return productRepository.findFirstByStatus(ProductStatus.ACTIVE);
@@ -56,10 +54,7 @@ public class ProductService {
 
     public Product createProduct(Product product, MultipartFile imageFile) throws IOException {
         if (imageFile != null && !imageFile.isEmpty()) {
-            String fileName = System.currentTimeMillis() + "" + (int)(Math.random() * 1000);
-            Path filePath = resolveUploadPath(fileName);
-            Files.write(filePath, imageFile.getBytes());
-            product.setImage(fileName);
+            product.setImage(storeImageToDatabase(imageFile));
         }
 
         product.setStatus(ProductStatus.ACTIVE);
@@ -74,10 +69,7 @@ public class ProductService {
         if (imageFiles != null && !imageFiles.isEmpty()) {
             for (MultipartFile imageFile : imageFiles) {
                 if (imageFile != null && !imageFile.isEmpty()) {
-                    String fileName = System.currentTimeMillis() + "" + (int)(Math.random() * 1000);
-                    Path filePath = resolveUploadPath(fileName);
-                    Files.write(filePath, imageFile.getBytes());
-                    product.getImages().add(fileName);
+                    product.getImages().add(storeImageToDatabase(imageFile));
                 }
             }
         }
@@ -97,10 +89,7 @@ public class ProductService {
             if (imageFiles != null && !imageFiles.isEmpty()) {
                 for (MultipartFile imageFile : imageFiles) {
                     if (imageFile != null && !imageFile.isEmpty()) {
-                        String fileName = System.currentTimeMillis() + "" + (int)(Math.random() * 1000);
-                        Path filePath = resolveUploadPath(fileName);
-                        Files.write(filePath, imageFile.getBytes());
-                        product.getImages().add(fileName);
+                        product.getImages().add(storeImageToDatabase(imageFile));
                     }
                 }
             }
@@ -433,10 +422,32 @@ public class ProductService {
         return productRepository.findAllByOrderByCreatedAtDesc(pageable);
     }
 
-    private Path resolveUploadPath(String fileName) throws IOException {
-        Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-        Files.createDirectories(uploadPath);
-        return uploadPath.resolve(fileName);
+    /**
+     * 上传文件字节入库（TiDB LONGBLOB），返回可直接访问的 URL：/images/{id}.{ext}
+     * 容器休眠/重启后文件依然可读（数据持久化在数据库）
+     */
+    private String storeImageToDatabase(MultipartFile imageFile) throws IOException {
+        byte[] bytes = imageFile.getBytes();
+
+        StoredImage stored = new StoredImage();
+        stored.setOriginalName(imageFile.getOriginalFilename());
+        String contentType = imageFile.getContentType();
+        stored.setContentType(contentType != null && !contentType.isEmpty() ? contentType : "application/octet-stream");
+        stored.setData(bytes);
+        stored = storedImageRepository.save(stored);
+
+        // 保留原始扩展名，供前端判断图片/视频/音频类型；只保留字母数字防注入
+        String ext = "";
+        String originalName = imageFile.getOriginalFilename();
+        if (originalName != null && originalName.lastIndexOf('.') >= 0) {
+            ext = originalName.substring(originalName.lastIndexOf('.') + 1)
+                    .replaceAll("[^a-zA-Z0-9]", "");
+            if (!ext.isEmpty()) {
+                ext = "." + ext.toLowerCase();
+            }
+        }
+        log.info("文件已入库: id={}, 原名={}, 大小={}B", stored.getId(), originalName, bytes.length);
+        return "/images/" + stored.getId() + ext;
     }
 }
 

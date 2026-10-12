@@ -1,4 +1,9 @@
 // 卖家后台JavaScript
+// 文件地址兼容：新上传的文件存数据库，URL 形如 /images/12.jpg；旧数据为裸文件名走 /uploads/
+function fileUrl(p) {
+    return p && p.startsWith('/') ? p : '/uploads/' + p;
+}
+
 let currentSeller = null;
 let quillEditor = null;
 let categoryTree = [];
@@ -380,7 +385,7 @@ function showProductDetails(productId) {
                                 ${product.images && product.images.length > 0 ? 
                                     product.images.map(img => `
                                         <div class="gallery-item">
-                                            <img src="/uploads/${img}" alt="${product.name}">
+                                            <img src="${fileUrl(img)}" alt="${product.name}">
                                         </div>
                                     `).join('') : 
                                     '<p>暂无图片</p>'
@@ -400,7 +405,7 @@ function showProductDetails(productId) {
                                         return `
                                             <div class="media-item">
                                                 <video controls style="max-width: 100%;">
-                                                    <source src="/uploads/${file}" type="video/${fileExtension === 'webm' ? 'webm' : fileExtension === 'ogg' ? 'ogg' : 'mp4'}">
+                                                    <source src="${fileUrl(file)}" type="video/${fileExtension === 'webm' ? 'webm' : fileExtension === 'ogg' ? 'ogg' : 'mp4'}">
                                                     您的浏览器不支持视频播放。
                                                 </video>
                                                 <p>${file}</p>
@@ -410,7 +415,7 @@ function showProductDetails(productId) {
                                         return `
                                             <div class="media-item">
                                                 <audio controls>
-                                                    <source src="/uploads/${file}" type="audio/${fileExtension === 'ogg' ? 'ogg' : 'mpeg'}">
+                                                    <source src="${fileUrl(file)}" type="audio/${fileExtension === 'ogg' ? 'ogg' : 'mpeg'}">
                                                     您的浏览器不支持音频播放。
                                                 </audio>
                                                 <p>${file}</p>

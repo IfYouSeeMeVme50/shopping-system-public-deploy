@@ -1,5 +1,10 @@
 'use strict';
 
+// 文件地址兼容：新上传的文件存数据库，URL 形如 /images/12.jpg；旧数据为裸文件名走 /uploads/
+function fileUrl(p) {
+    return p && p.startsWith('/') ? p : '/uploads/' + p;
+}
+
 // ===== 全局状态 =====
 let currentUser = null;
 let allProducts = [];
@@ -271,7 +276,7 @@ function displayProducts() {
 function buildProductCard(product) {
     const hasImage = product.images && product.images.length > 0;
     const imageBlock = hasImage
-        ? `<img src="/uploads/${product.images[0]}" alt="${product.name}" onclick="showProductDetails(${product.id})">
+        ? `<img src="${fileUrl(product.images[0])}" alt="${product.name}" onclick="showProductDetails(${product.id})">
            <div class="view-details-overlay" onclick="showProductDetails(${product.id})"><span>查看详情</span></div>`
         : '<div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f8f9fa; color: #6c757d;">暂无图片</div>';
 
@@ -318,7 +323,7 @@ function showProductDetails(productId) {
     const imageGallery = product.images && product.images.length
         ? product.images.map(img => `
                 <div class="gallery-item">
-                    <img src="/uploads/${img}" alt="${product.name}">
+                    <img src="${fileUrl(img)}" alt="${product.name}">
                 </div>
             `).join('')
         : '<p>暂无图片</p>';
@@ -536,7 +541,7 @@ async function showOrderHistory() {
                     <div class="order-product-info">
                         <div class="product-image">
                             ${intent.product && intent.product.images && intent.product.images.length > 0
-                                ? `<img src="/uploads/${intent.product.images[0]}" alt="${intent.product.name}">`
+                                ? `<img src="${fileUrl(intent.product.images[0])}" alt="${intent.product.name}">`
                                 : '<div class="no-image">暂无图片</div>'}
                         </div>
                         <div class="product-details">
@@ -918,7 +923,7 @@ async function showCart() {
                 </div>
                 <div class="cart-item-image">
                     ${item.product.images && item.product.images.length > 0 
-                        ? `<img src="/uploads/${item.product.images[0]}" alt="${item.product.name}">`
+                        ? `<img src="${fileUrl(item.product.images[0])}" alt="${item.product.name}">`
                         : '<div class="no-image">暂无图片</div>'}
                 </div>
                 <div class="cart-item-details">
@@ -1160,7 +1165,7 @@ async function showFavorites() {
                 </div>
                 <div class="favorite-image">
                     ${hasImage 
-                        ? `<img src="/uploads/${fav.images[0]}" alt="${fav.name}">`
+                        ? `<img src="${fileUrl(fav.images[0])}" alt="${fav.name}">`
                         : '<div class="no-image">暂无图片</div>'}
                 </div>
                 <div class="favorite-details">
