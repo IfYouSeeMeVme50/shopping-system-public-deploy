@@ -1576,3 +1576,43 @@ button:disabled {
         justify-content: space-between;
     }
 }
+
+/* 商品编辑弹窗表单 */
+.edit-form-row {
+    margin-bottom: 15px;
+}
+
+.edit-form-row label {
+    display: block;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 6px;
+}
+
+.edit-form-row input[type="text"],
+.edit-form-row input[type="number"],
+.edit-form-row select,
+.edit-form-row textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.edit-img-item {
+    position: relative;
+}
+
+.img-delete-btn {
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.edit-form-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+}

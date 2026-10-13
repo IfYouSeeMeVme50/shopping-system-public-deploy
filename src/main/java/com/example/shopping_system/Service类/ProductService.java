@@ -48,6 +48,9 @@ public class ProductService {
     @Autowired
     private StoredImageRepository storedImageRepository;
 
+    @Autowired
+    private com.example.shopping_system.Repository接口.PurchaseIntentRepository purchaseIntentRepository;
+
     public Optional<Product> getActiveProduct() {
         return productRepository.findFirstByStatus(ProductStatus.ACTIVE);
     }
@@ -370,6 +373,114 @@ public class ProductService {
             tree.add(node);
         }
         return tree;
+    }
+
+    /**
+     * 编辑商品信息（名称/描述/价格/库存/分类），可选追加新图片
+     */
+    @Transactional
+    public Product updateProductInfo(Long productId, String name, String description,
+                                     Double price, Integer stock, Category category,
+                                     List<MultipartFile> newImages) throws IOException {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("商品不存在"));
+
+        if (name != null && !name.trim().isEmpty()) {
+            product.setName(name.trim());
+        }
+        product.setDescription(description);
+        if (price != null && price > 0) {
+            product.setPrice(price);
+        }
+        if (stock != null && stock >= 0) {
+            product.setStock(stock);
+            // 库存补回后自动恢复在售；清零则标记已售（与原有 updateStock 逻辑一致）
+            if (stock == 0 && product.getStatus() == ProductStatus.ACTIVE) {
+                product.setStatus(ProductStatus.SOLD);
+            } else if (stock > 0 && product.getStatus() == ProductStatus.SOLD) {
+                product.setStatus(ProductStatus.ACTIVE);
+                product.setSoldAt(null);
+            }
+        }
+        if (category != null) {
+            product.setCategory(category);
+        }
+
+        if (newImages != null && !newImages.isEmpty()) {
+            for (MultipartFile imageFile : newImages) {
+                if (imageFile != null && !imageFile.isEmpty()) {
+                    product.getImages().add(storeImageToDatabase(imageFile));
+                }
+            }
+        }
+
+        Product saved = productRepository.save(product);
+        redisCacheService.clearProductCache(productId);
+        log.info("商品信息已更新，已清除Redis缓存: id={}", productId);
+        return saved;
+    }
+
+    /**
+     * 删除商品的某张图片；若为 /images/{id} 格式（存数据库）则连同 stored_images 记录一并删除
+     */
+    @Transactional
+    public Product removeProductImage(Long productId, String imageUrl) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("商品不存在"));
+
+        if (imageUrl == null || !product.getImages().remove(imageUrl)) {
+            throw new IllegalArgumentException("图片不存在于该商品");
+        }
+        deleteStoredImageIfDbBacked(imageUrl);
+
+        Product saved = productRepository.save(product);
+        redisCacheService.clearProductCache(productId);
+        log.info("商品图片已删除: productId={}, url={}", productId, imageUrl);
+        return saved;
+    }
+
+    /**
+     * 删除商品。有订单记录的商品不允许删除（订单表外键引用），引导卖家改为下架
+     */
+    @Transactional
+    public void deleteProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("商品不存在"));
+
+        if (purchaseIntentRepository.countByProduct_Id(productId) > 0) {
+            throw new IllegalStateException("该商品存在订单记录，无法删除；如需隐藏请使用下架");
+        }
+
+        // 清理入库的图片字节数据
+        if (product.getImages() != null) {
+            for (String url : new ArrayList<>(product.getImages())) {
+                deleteStoredImageIfDbBacked(url);
+            }
+        }
+
+        productRepository.delete(product);
+        redisCacheService.clearProductCache(productId);
+        log.info("商品已删除: id={}", productId);
+    }
+
+    /**
+     * 若 URL 为 /images/{id}.ext 格式则删除对应 stored_images 记录（静默容错）
+     */
+    private void deleteStoredImageIfDbBacked(String imageUrl) {
+        if (imageUrl == null || !imageUrl.startsWith("/images/")) {
+            return;
+        }
+        try {
+            String rest = imageUrl.substring("/images/".length());
+            int dot = rest.indexOf('.');
+            Long imageId = Long.parseLong(dot >= 0 ? rest.substring(0, dot) : rest);
+            if (storedImageRepository.existsById(imageId)) {
+                storedImageRepository.deleteById(imageId);
+                log.info("已删除stored_images记录: id={}", imageId);
+            }
+        } catch (Exception e) {
+            log.warn("删除图片数据失败（不影响主流程）: url={}, {}", imageUrl, e.getMessage());
+        }
     }
 
     public void updateStock(Long productId, Integer newStock) {

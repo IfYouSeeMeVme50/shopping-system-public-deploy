@@ -20,4 +20,7 @@ public interface PurchaseIntentRepository extends JpaRepository<PurchaseIntent, 
     
     // 根据客户手机号查找购买意向，按创建时间倒序排列
     List<PurchaseIntent> findByCustomerPhoneOrderByCreatedAtDesc(String customerPhone);
+
+    // 统计某商品的订单数量（删除商品前的引用检查）
+    long countByProduct_Id(Long productId);
 }

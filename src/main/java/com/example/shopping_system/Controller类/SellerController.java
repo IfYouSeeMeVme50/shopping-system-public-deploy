@@ -4,6 +4,7 @@ import com.example.shopping_system.DTO类.*;
 import com.example.shopping_system.实体类.Category;
 import com.example.shopping_system.实体类.Customer;
 import com.example.shopping_system.实体类.Product;
+import com.example.shopping_system.实体类.ProductStatus;
 import com.example.shopping_system.实体类.PurchaseIntent;
 import com.example.shopping_system.实体类.IntentStatus;
 import com.example.shopping_system.实体类.Seller;
@@ -266,6 +267,93 @@ public class SellerController {
             return ResponseEntity.ok(productService.getAllProducts());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "加载历史商品失败"));
+        }
+    }
+
+    // 编辑商品信息（可追加新图片）
+    @PutMapping("/product/{id}")
+    public ResponseEntity<?> updateProduct(
+            @PathVariable Long id,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) Double price,
+            @RequestParam(required = false) Integer stock,
+            @RequestParam(required = false) String primaryCategory,
+            @RequestParam(required = false) String secondaryCategory,
+            @RequestParam(required = false) List<MultipartFile> newImages) {
+        try {
+            Category category = null;
+            if (primaryCategory != null && !primaryCategory.trim().isEmpty()
+                    && secondaryCategory != null && !secondaryCategory.trim().isEmpty()) {
+                category = resolveCategory(primaryCategory, secondaryCategory);
+            }
+            Product updated = productService.updateProductInfo(
+                    id, name, description, price, stock, category, newImages);
+            return ResponseEntity.ok(Map.of("message", "商品已更新", "product", updated));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "图片上传失败: " + e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "更新失败: " + e.getMessage()));
+        }
+    }
+
+    // 删除商品的某张图片
+    @DeleteMapping("/product/{id}/image")
+    public ResponseEntity<?> deleteProductImage(@PathVariable Long id, @RequestParam String url) {
+        try {
+            Product updated = productService.removeProductImage(id, url);
+            return ResponseEntity.ok(Map.of("message", "图片已删除", "product", updated));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "删除图片失败: " + e.getMessage()));
+        }
+    }
+
+    // 上架/下架商品
+    @PutMapping("/product/{id}/status")
+    public ResponseEntity<?> updateProductStatus(@PathVariable Long id, @RequestBody Map<String, String> request) {
+        try {
+            String statusValue = request.get("status");
+            if (statusValue == null || statusValue.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "状态不能为空"));
+            }
+            ProductStatus newStatus;
+            try {
+                newStatus = ProductStatus.valueOf(statusValue.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body(Map.of("error", "无效的状态值: " + statusValue));
+            }
+            if (newStatus == ProductStatus.SOLD) {
+                return ResponseEntity.badRequest().body(Map.of("error", "已售状态由交易流程自动管理，不能手动设置"));
+            }
+            Product product = productService.getProductById(id).orElse(null);
+            if (product == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "商品不存在"));
+            }
+            if (newStatus == ProductStatus.ACTIVE && product.getStock() != null && product.getStock() == 0) {
+                return ResponseEntity.badRequest().body(Map.of("error", "库存为 0，无法上架"));
+            }
+            Product updated = productService.updateProductStatus(id, newStatus);
+            String message = newStatus == ProductStatus.ACTIVE ? "商品已上架" : "商品已下架";
+            return ResponseEntity.ok(Map.of("message", message, "product", updated));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "状态更新失败: " + e.getMessage()));
+        }
+    }
+
+    // 删除商品（有订单记录的商品会被拒绝，引导下架）
+    @DeleteMapping("/product/{id}")
+    public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
+        try {
+            productService.deleteProduct(id);
+            return ResponseEntity.ok(Map.of("message", "商品已删除"));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "删除失败: " + e.getMessage()));
         }
     }
 

@@ -758,6 +758,12 @@ async function loadProductsHistory() {
                         <td>${product.sold_at ? new Date(product.sold_at).toLocaleString() : '-'}</td>
                         <td>
                             <button class="btn btn-info btn-sm" onclick="showProductDetails(${product.id})">查看详情</button>
+                            <button class="btn btn-warning btn-sm" onclick="openEditProductModal(${product.id})">编辑</button>
+                            ${(product.status || '').toUpperCase() === 'ACTIVE' ?
+                                `<button class="btn btn-secondary btn-sm" onclick="toggleProductStatus(${product.id}, 'FROZEN')">下架</button>` : ''}
+                            ${(product.status || '').toUpperCase() === 'FROZEN' ?
+                                `<button class="btn btn-success btn-sm" onclick="toggleProductStatus(${product.id}, 'ACTIVE')">上架</button>` : ''}
+                            <button class="btn btn-danger btn-sm" onclick="deleteProduct(${product.id})">删除</button>
                         </td>
                     </tr>
                 `;
@@ -1273,5 +1279,237 @@ async function cancelOrderAsSeller(intentId, productName) {
     } catch (error) {
         console.error('取消订单失败:', error);
         showSellerMessage('取消订单失败，请重试', 'error');
+    }
+}
+
+// ==================== 商品管理（编辑/图片/上下架/删除） ====================
+
+// 打开编辑商品弹窗
+async function openEditProductModal(productId) {
+    try {
+        const response = await fetch(`/api/products/${productId}`);
+        if (!response.ok) {
+            showSellerMessage('获取商品信息失败', 'error');
+            return;
+        }
+        const product = await response.json();
+        renderEditProductModal(product);
+    } catch (error) {
+        console.error('获取商品信息失败:', error);
+        showSellerMessage('获取商品信息失败', 'error');
+    }
+}
+
+function renderEditProductModal(product) {
+    const old = document.getElementById('edit-product-modal');
+    if (old) old.remove();
+
+    const category = product.category || null;
+    const currentSecondaryId = category ? String(category.id) : '';
+    const currentPrimaryId = category && category.parent ? String(category.parent.id)
+        : (category && !category.parent ? String(category.id) : '');
+
+    const primaryOptions = (categoryTree || []).map(c =>
+        `<option value="${c.id}" ${String(c.id) === currentPrimaryId ? 'selected' : ''}>${c.name}</option>`
+    ).join('');
+
+    const imagesHtml = (product.images && product.images.length > 0)
+        ? product.images.map(img => `
+            <div class="gallery-item edit-img-item">
+                <img src="${fileUrl(img)}" alt="">
+                <button type="button" class="btn btn-danger btn-sm img-delete-btn"
+                        onclick="deleteProductImage(${product.id}, '${encodeURIComponent(img)}')">删除</button>
+            </div>
+        `).join('')
+        : '<p>暂无图片</p>';
+
+    const modal = document.createElement('div');
+    modal.className = 'product-details-modal';
+    modal.id = 'edit-product-modal';
+    modal.innerHTML = `
+        <div class="product-details-content">
+            <span class="close-modal" onclick="document.getElementById('edit-product-modal').remove()">&times;</span>
+            <h2>编辑商品 #${product.id}</h2>
+            <form id="edit-product-form" onsubmit="return saveProductEdit(event, ${product.id})">
+                <div class="edit-form-row">
+                    <label>名称</label>
+                    <input type="text" id="edit-name" value="${(product.name || '').replace(/"/g, '&quot;')}" maxlength="50" required>
+                </div>
+                <div class="edit-form-row">
+                    <label>价格（¥）</label>
+                    <input type="number" id="edit-price" value="${product.price}" min="0.01" step="0.01" required>
+                </div>
+                <div class="edit-form-row">
+                    <label>库存</label>
+                    <input type="number" id="edit-stock" value="${product.stock}" min="0" step="1" required>
+                </div>
+                <div class="edit-form-row">
+                    <label>描述</label>
+                    <textarea id="edit-description" rows="4">${product.description || ''}</textarea>
+                </div>
+                <div class="edit-form-row">
+                    <label>一级分类</label>
+                    <select id="edit-primary-category" onchange="refreshEditSecondaryOptions('${currentSecondaryId}')">
+                        <option value="">不修改</option>
+                        ${primaryOptions}
+                    </select>
+                </div>
+                <div class="edit-form-row">
+                    <label>二级分类</label>
+                    <select id="edit-secondary-category">
+                        <option value="">不修改</option>
+                    </select>
+                </div>
+                <div class="edit-form-row">
+                    <label>现有图片（点删除立即生效）</label>
+                    <div class="gallery-grid">${imagesHtml}</div>
+                </div>
+                <div class="edit-form-row">
+                    <label>追加新图片</label>
+                    <input type="file" id="edit-new-images" multiple accept="image/*,video/*,audio/*">
+                </div>
+                <div class="edit-form-actions">
+                    <button type="submit" class="btn btn-success">保存修改</button>
+                    <button type="button" class="btn btn-secondary"
+                            onclick="document.getElementById('edit-product-modal').remove()">取消</button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // 若当前商品已有分类，预填二级分类选项
+    if (currentPrimaryId) {
+        refreshEditSecondaryOptions(currentSecondaryId);
+    }
+}
+
+// 根据一级分类刷新编辑弹窗的二级分类选项
+function refreshEditSecondaryOptions(selectedId) {
+    const primaryId = document.getElementById('edit-primary-category').value;
+    const secondarySelect = document.getElementById('edit-secondary-category');
+    secondarySelect.innerHTML = '<option value="">不修改</option>';
+    if (!primaryId) return;
+    const primary = (categoryTree || []).find(c => String(c.id) === String(primaryId));
+    if (!primary || !primary.children) return;
+    primary.children.forEach(child => {
+        const opt = document.createElement('option');
+        opt.value = child.id;
+        opt.textContent = child.name;
+        if (selectedId && String(child.id) === String(selectedId)) {
+            opt.selected = true;
+        }
+        secondarySelect.appendChild(opt);
+    });
+}
+
+// 保存商品编辑
+async function saveProductEdit(event, productId) {
+    event.preventDefault();
+
+    const formData = new FormData();
+    formData.append('name', document.getElementById('edit-name').value);
+    formData.append('description', document.getElementById('edit-description').value);
+    formData.append('price', document.getElementById('edit-price').value);
+    formData.append('stock', document.getElementById('edit-stock').value);
+
+    const primaryCategory = document.getElementById('edit-primary-category').value;
+    const secondaryCategory = document.getElementById('edit-secondary-category').value;
+    if (primaryCategory && secondaryCategory) {
+        formData.append('primaryCategory', primaryCategory);
+        formData.append('secondaryCategory', secondaryCategory);
+    }
+
+    const files = document.getElementById('edit-new-images').files;
+    for (const file of files) {
+        formData.append('newImages', file);
+    }
+
+    try {
+        const response = await fetch(`/api/seller/product/${productId}`, {
+            method: 'PUT',
+            body: formData
+        });
+        const result = await response.json();
+        if (response.ok) {
+            showSellerMessage(result.message || '商品已更新', 'success');
+            const modal = document.getElementById('edit-product-modal');
+            if (modal) modal.remove();
+            loadProductsHistory();
+            loadCurrentProductInfo();
+        } else {
+            showSellerMessage(result.error || '更新失败', 'error');
+        }
+    } catch (error) {
+        console.error('更新商品失败:', error);
+        showSellerMessage('更新失败，请重试', 'error');
+    }
+    return false;
+}
+
+// 删除商品的单张图片
+async function deleteProductImage(productId, encodedUrl) {
+    if (!confirm('确定删除这张图片吗？')) return;
+    try {
+        const response = await fetch(`/api/seller/product/${productId}/image?url=${encodedUrl}`, {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+        if (response.ok) {
+            showSellerMessage(result.message || '图片已删除', 'success');
+            // 用最新数据重渲染弹窗
+            renderEditProductModal(result.product);
+            loadProductsHistory();
+        } else {
+            showSellerMessage(result.error || '删除图片失败', 'error');
+        }
+    } catch (error) {
+        console.error('删除图片失败:', error);
+        showSellerMessage('删除图片失败，请重试', 'error');
+    }
+}
+
+// 上架/下架商品
+async function toggleProductStatus(productId, newStatus) {
+    const actionText = newStatus === 'ACTIVE' ? '上架' : '下架';
+    if (!confirm(`确定${actionText}该商品吗？`)) return;
+    try {
+        const response = await fetch(`/api/seller/product/${productId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        });
+        const result = await response.json();
+        if (response.ok) {
+            showSellerMessage(result.message || `商品已${actionText}`, 'success');
+            loadProductsHistory();
+            loadCurrentProductInfo();
+        } else {
+            showSellerMessage(result.error || `${actionText}失败`, 'error');
+        }
+    } catch (error) {
+        console.error(`${actionText}失败:`, error);
+        showSellerMessage(`${actionText}失败，请重试`, 'error');
+    }
+}
+
+// 删除商品（有订单记录的商品会被后端拒绝，引导下架）
+async function deleteProduct(productId) {
+    if (!confirm('确定删除该商品吗？删除后不可恢复。\n（有订单记录的商品无法删除，建议使用下架）')) return;
+    try {
+        const response = await fetch(`/api/seller/product/${productId}`, {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+        if (response.ok) {
+            showSellerMessage(result.message || '商品已删除', 'success');
+            loadProductsHistory();
+            loadCurrentProductInfo();
+        } else {
+            showSellerMessage(result.error || '删除失败', 'error');
+        }
+    } catch (error) {
+        console.error('删除商品失败:', error);
+        showSellerMessage('删除失败，请重试', 'error');
     }
 }
