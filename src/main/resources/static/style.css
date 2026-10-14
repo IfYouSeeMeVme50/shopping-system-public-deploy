@@ -1577,6 +1577,21 @@ button:disabled {
     }
 }
 
+/* 表格横向滚动容器（购买意向等宽表格） */
+.table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll .data-table {
+    min-width: 1080px;
+}
+
+.table-scroll .data-table th,
+.table-scroll .data-table td {
+    white-space: nowrap;
+}
+
 /* 商品编辑弹窗表单 */
 .edit-form-row {
     margin-bottom: 15px;

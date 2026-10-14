@@ -508,6 +508,10 @@ async function loadCurrentProductInfo() {
                         <td>${new Date(product.created_at).toLocaleString()}</td>
                         <td>
                             <button class="btn btn-info btn-sm" onclick="showProductDetails(${product.id})">查看详情</button>
+                            <button class="btn btn-warning btn-sm" onclick="openEditProductModal(${product.id})">编辑</button>
+                            ${(product.status || '').toUpperCase() === 'ACTIVE' ?
+                                `<button class="btn btn-secondary btn-sm" onclick="toggleProductStatus(${product.id}, 'FROZEN')">下架</button>` : ''}
+                            <button class="btn btn-danger btn-sm" onclick="deleteProduct(${product.id})">删除</button>
                         </td>
                     </tr>
                 `;
@@ -604,6 +608,7 @@ async function loadPurchaseIntents() {
         
         if (intents.length > 0) {
             let html = `
+                <div class="table-scroll">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -671,7 +676,7 @@ async function loadPurchaseIntents() {
                 `;
             });
             
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             intentsList.innerHTML = html;
         } else {
             intentsList.innerHTML = '<p>暂无购买意向</p>';
