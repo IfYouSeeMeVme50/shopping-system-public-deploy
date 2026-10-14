@@ -442,7 +442,7 @@ function showProductDetails(productId) {
                             'frozen': '已冻结',
                             'sold': '已售出'
                         }[product.status] || product.status}</p>
-                        <p><strong>发布时间：</strong>${new Date(product.created_at).toLocaleString()}</p>
+                        <p><strong>发布时间：</strong>${new Date(product.createdAt || product.created_at).toLocaleString()}</p>
                     </div>
                 </div>
             `;
@@ -505,7 +505,7 @@ async function loadCurrentProductInfo() {
                         <td>${product.stock || 0}</td>
                         <td>${product.frozenStock || 0}</td>
                         <td><span class="${statusClass}">${statusText}</span></td>
-                        <td>${new Date(product.created_at).toLocaleString()}</td>
+                        <td>${new Date(product.createdAt || product.created_at).toLocaleString()}</td>
                         <td>
                             <button class="btn btn-info btn-sm" onclick="showProductDetails(${product.id})">查看详情</button>
                             <button class="btn btn-warning btn-sm" onclick="openEditProductModal(${product.id})">编辑</button>
@@ -759,8 +759,8 @@ async function loadProductsHistory() {
                         <td>${product.name}</td>
                         <td>¥${parseFloat(product.price).toFixed(2)}</td>
                         <td><span class="${statusClass}">${statusText}</span></td>
-                        <td>${new Date(product.created_at).toLocaleString()}</td>
-                        <td>${product.sold_at ? new Date(product.sold_at).toLocaleString() : '-'}</td>
+                        <td>${new Date(product.createdAt || product.created_at).toLocaleString()}</td>
+                        <td>${product.soldAt || product.sold_at ? new Date(product.soldAt || product.sold_at).toLocaleString() : '-'}</td>
                         <td>
                             <button class="btn btn-info btn-sm" onclick="showProductDetails(${product.id})">查看详情</button>
                             <button class="btn btn-warning btn-sm" onclick="openEditProductModal(${product.id})">编辑</button>
